@@ -1,0 +1,23 @@
+# Secrets — never commit these
+.env
+*.pem
+sf_private_key*.pem
+sf_certificate*.pem
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Reports output
+reports/
+
+# IDE
+.vscode/
+.idea/
+*.swp

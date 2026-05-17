@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ProjectZen — SF Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=DM+Serif+Display:ital@1&display=swap" rel="stylesheet"/>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<style>
+/* ── Reset ── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+/* ── Design tokens ── */
+:root{
+  --bg:        #08051a;
+  --bg2:       #0f0a28;
+  --card:      rgba(255,255,255,0.04);
+  --border:    rgba(139,92,246,0.18);
+  --border2:   rgba(139,92,246,0.35);
+  --purple:    #8b5cf6;
+  --purple-lt: #a78bfa;
+  --purple-dk: #6d28d9;
+  --pink:      #f472b6;
+  --pink-lt:   #fbb6ce;
+  --text:      #f1f5f9;
+  --muted:     #64748b;
+  --success:   #34d399;
+  --warn:      #fbbf24;
+  --red:       #f87171;
+  --radius:    14px;
+  --shadow:    0 8px 32px rgba(0,0,0,0.45);
+}
+
+/* ── Base ── */
+html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.6}
+body{display:flex;flex-direction:column;min-height:100vh;overflow-x:hidden}
+
+/* ── Animated background mesh ── */
+body::before{
+  content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(ellipse 80% 60% at 20% -10%,rgba(109,40,217,0.22) 0%,transparent 60%),
+    radial-gradient(ellipse 60% 50% at 80% 110%,rgba(139,92,246,0.15) 0%,transparent 60%),
+    radial-gradient(ellipse 40% 30% at 50% 50%,rgba(244,114,182,0.06) 0%,transparent 70%);
+  animation:meshFloat 12s ease-in-out infinite alternate;
+}
+@keyframes meshFloat{from{opacity:.8}to{opacity:1;transform:scale(1.04) translateY(-8px)}}
+
+/* ── Layout ── */
+#app{position:relative;z-index:1;display:flex;flex-direction:column;min-height:100vh}
+
+/* ── Header ── */
+header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:18px 40px;
+  border-bottom:1px solid var(--border);
+  background:rgba(8,5,26,0.85);
+  backdrop-filter:blur(16px);
+  position:sticky;top:0;z-index:100;
+}
+.logo{display:flex;align-items:baseline;gap:2px;user-select:none}
+.logo-project{font-size:22px;font-weight:700;color:#fff;letter-spacing:-.5px}
+.logo-zen{
+  font-family:'DM Serif Display',Georgia,serif;
+  font-style:italic;font-size:24px;
+  background:linear-gradient(135deg,var(--purple-lt),var(--pink));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  letter-spacing:-.3px;
+}
+.header-badge{
+  font-size:11px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--muted);border:1px solid var(--border);
+  padding:4px 12px;border-radius:20px;
+}
+
+/* ── Main content ── */
+main{flex:1;padding:40px 40px 60px;max-width:1200px;width:100%;margin:0 auto}
+
+/* ── Prompt card ── */
+.prompt-card{
+  background:var(--card);border:1px solid var(--border2);
+  border-radius:var(--radius);padding:28px 28px 20px;
+  backdrop-filter:blur(8px);box-shadow:var(--shadow);
+  margin-bottom:28px;
+}
+.prompt-label{
+  font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--purple-lt);margin-bottom:14px;display:flex;align-items:center;gap:8px;
+}
+.prompt-label::before{content:'';display:block;width:8px;height:8px;border-radius:50%;background:var(--purple);box-shadow:0 0 8px var(--purple)}
+.prompt-wrap{
+  position:relative;
+  background:rgba(255,255,255,0.03);
+  border:1px solid var(--border);border-radius:10px;
+  transition:border-color .2s;
+}
+.prompt-wrap:focus-within{border-color:var(--purple)}
+#prompt{
+  width:100%;background:transparent;border:none;outline:none;
+  color:var(--text);font-family:'Inter',sans-serif;font-size:15px;
+  padding:16px 140px 16px 18px;resize:none;min-height:80px;max-height:200px;
+  line-height:1.6;
+}
+#prompt::placeholder{color:var(--muted)}
+#send-btn{
+  position:absolute;right:12px;bottom:12px;
+  background:linear-gradient(135deg,var(--purple-dk),var(--purple));
+  color:#fff;border:none;border-radius:8px;
+  padding:10px 22px;font-family:'Inter',sans-serif;font-weight:600;font-size:13px;
+  cursor:pointer;display:flex;align-items:center;gap:8px;
+  transition:opacity .2s,transform .1s;box-shadow:0 4px 14px rgba(109,40,217,0.5);
+}
+#send-btn:hover{opacity:.9;transform:translateY(-1px)}
+#send-btn:active{transform:translateY(0)}
+#send-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.send-icon{width:16px;height:16px;fill:currentColor}
+
+/* ── Quick chips ── */
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.chip{
+  background:rgba(139,92,246,0.1);border:1px solid var(--border);
+  border-radius:20px;padding:5px 14px;font-size:12px;color:var(--purple-lt);
+  cursor:pointer;transition:background .2s,border-color .2s;white-space:nowrap;
+}
+.chip:hover{background:rgba(139,92,246,0.22);border-color:var(--purple)}
+
+/* ── Trace panel ── */
+.panel{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--radius);margin-bottom:20px;
+  backdrop-filter:blur(8px);overflow:hidden;
+}
+.panel-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 20px;border-bottom:1px solid var(--border);
+  cursor:pointer;user-select:none;
+}
+.panel-title{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px}
+.panel-chevron{color:var(--muted);transition:transform .2s;font-size:16px}
+.panel.collapsed .panel-chevron{transform:rotate(-90deg)}
+.panel.collapsed .panel-body{display:none}
+.panel-body{padding:14px 20px}
+
+/* ── Trace steps ── */
+#trace-list{display:flex;flex-direction:column;gap:8px}
+.trace-step{
+  display:flex;align-items:flex-start;gap:12px;
+  padding:10px 14px;border-radius:8px;
+  background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.05);
+  font-size:12px;line-height:1.5;
+}
+.trace-step.thinking{border-color:rgba(139,92,246,0.2)}
+.trace-step.tool-start{border-color:rgba(251,191,36,0.2)}
+.trace-step.tool-end{border-color:rgba(52,211,153,0.15)}
+.trace-icon{font-size:14px;margin-top:1px;flex-shrink:0}
+.trace-content{flex:1;min-width:0}
+.trace-tool{font-weight:600;color:var(--warn)}
+.trace-input{color:var(--muted);word-break:break-all;margin-top:3px;font-size:11px;font-family:monospace}
+.trace-out{color:var(--success);font-size:11px;font-family:monospace;word-break:break-all;margin-top:3px;max-height:80px;overflow:hidden}
+.thinking-dot{display:inline-flex;gap:4px;margin-top:2px}
+.thinking-dot span{width:6px;height:6px;border-radius:50%;background:var(--purple-lt);animation:dotBounce 1.2s infinite ease-in-out}
+.thinking-dot span:nth-child(2){animation-delay:.2s}
+.thinking-dot span:nth-child(3){animation-delay:.4s}
+@keyframes dotBounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-6px)}}
+
+/* ── Results ── */
+.result-summary{
+  font-size:14px;color:var(--text);line-height:1.7;
+  padding:16px 20px;
+  border-bottom:1px solid var(--border);
+}
+.result-summary .agent-label{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--purple-lt);display:block;margin-bottom:6px}
+
+/* ── Table wrapper ── */
+.table-wrap{overflow-x:auto;padding:0 2px 2px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+thead tr{background:rgba(139,92,246,0.1)}
+thead th{
+  padding:10px 14px;text-align:left;font-weight:600;font-size:11px;
+  letter-spacing:.06em;text-transform:uppercase;
+  color:var(--purple-lt);white-space:nowrap;
+  border-bottom:1px solid var(--border2);
+  position:sticky;top:0;background:rgba(15,10,40,.95);z-index:1;
+}
+tbody tr{border-bottom:1px solid rgba(255,255,255,0.04);transition:background .15s}
+tbody tr:hover{background:rgba(139,92,246,0.07)}
+tbody td{padding:9px 14px;color:var(--text);max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.null-val{color:var(--muted);font-style:italic;font-size:11px}
+
+/* ── Result footer ── */
+.result-footer{
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;
+  padding:14px 20px;border-top:1px solid var(--border);
+}
+.row-count{font-size:12px;color:var(--muted)}
+.row-count strong{color:var(--text);font-weight:600}
+.dl-group{display:flex;gap:8px}
+.dl-btn{
+  display:flex;align-items:center;gap:6px;padding:7px 16px;
+  border-radius:7px;font-size:12px;font-weight:500;cursor:pointer;
+  text-decoration:none;border:1px solid;transition:all .2s;
+}
+.dl-btn.csv{color:#34d399;border-color:rgba(52,211,153,0.3);background:rgba(52,211,153,0.07)}
+.dl-btn.csv:hover{background:rgba(52,211,153,0.15)}
+.dl-btn.xlsx{color:#60a5fa;border-color:rgba(96,165,250,0.3);background:rgba(96,165,250,0.07)}
+.dl-btn.xlsx:hover{background:rgba(96,165,250,0.15)}
+
+/* ── Empty / error states ── */
+.state-box{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:48px 20px;text-align:center;color:var(--muted);gap:12px;
+}
+.state-box .state-icon{font-size:36px;opacity:.6}
+.state-box p{font-size:13px;max-width:360px;line-height:1.7}
+.error-box{
+  background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.25);
+  border-radius:10px;padding:16px 20px;color:var(--red);font-size:13px;
+  display:flex;gap:12px;align-items:flex-start;margin-bottom:20px;
+}
+
+/* ── Loading spinner on button ── */
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner{
+  width:14px;height:14px;border:2px solid rgba(255,255,255,0.3);
+  border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;
+}
+
+/* ── Footer ── */
+footer{
+  padding:18px 40px;border-top:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  font-size:11px;color:var(--muted);
+}
+.footer-logo{display:flex;align-items:baseline;gap:2px;opacity:.6}
+.footer-logo .lp{font-weight:600;color:#fff}
+.footer-logo .lz{font-family:'DM Serif Display',serif;font-style:italic;background:linear-gradient(135deg,var(--purple-lt),var(--pink));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(139,92,246,0.3);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:rgba(139,92,246,0.5)}
+
+/* ── Utility ── */
+.hidden{display:none!important}
+</style>
+</head>
+
+<body>
+<div id="app">
+
+<!-- ── Header ── -->
+<header>
+  <div class="logo">
+    <span class="logo-project">Project</span><span class="logo-zen">Zen</span>
+  </div>
+  <span class="header-badge">SAP SuccessFactors Intelligence</span>
+</header>
+
+<!-- ── Main ── -->
+<main>
+
+  <!-- Prompt card -->
+  <div class="prompt-card">
+    <div class="prompt-label">Ask your workforce data</div>
+    <div class="prompt-wrap">
+      <textarea id="prompt" rows="3" placeholder="e.g. List all vacant positions with position number and title…"></textarea>
+      <button id="send-btn">
+        <svg class="send-icon" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        Run
+      </button>
+    </div>
+    <div class="chips">
+      <div class="chip">List all vacant positions</div>
+      <div class="chip">Employees hired this month — name, gender, hire date</div>
+      <div class="chip">Cost centers created in May 2026</div>
+      <div class="chip">All active employees with department</div>
+      <div class="chip">Headcount by department</div>
+    </div>
+  </div>
+
+  <!-- Error box -->
+  <div id="error-box" class="error-box hidden">
+    <span>⚠</span>
+    <span id="error-msg"></span>
+  </div>
+
+  <!-- Agent trace panel -->
+  <div id="trace-panel" class="panel hidden">
+    <div class="panel-header" onclick="togglePanel(this)">
+      <span class="panel-title">
+        <span id="trace-status-dot" style="width:8px;height:8px;border-radius:50%;background:var(--warn);display:inline-block"></span>
+        Agent Trace
+      </span>
+      <span class="panel-chevron">›</span>
+    </div>
+    <div class="panel-body">
+      <div id="trace-list"></div>
+    </div>
+  </div>
+
+  <!-- Results panel -->
+  <div id="results-panel" class="panel hidden">
+    <div class="panel-header" onclick="togglePanel(this)">
+      <span class="panel-title">Results</span>
+      <span class="panel-chevron">›</span>
+    </div>
+    <div class="panel-body" style="padding:0">
+      <div class="result-summary" id="agent-summary">
+        <span class="agent-label">Agent Response</span>
+        <span id="summary-text"></span>
+      </div>
+      <div class="table-wrap" id="table-wrap"></div>
+      <div class="result-footer">
+        <span class="row-count">Showing <strong id="row-count">0</strong> rows</span>
+        <div class="dl-group" id="dl-group"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Empty welcome state -->
+  <div id="welcome" class="state-box">
+    <span class="state-icon">🧠</span>
+    <p>Enter a natural language question about your SAP SuccessFactors data. The agent will query the right entities and return a formatted report.</p>
+  </div>
+
+</main>
+
+<!-- ── Footer ── -->
+<footer>
+  <div class="footer-logo">
+    <span class="lp">Project</span><span class="lz">Zen</span>
+  </div>
+  <span>Powered by Claude Sonnet &amp; SAP SuccessFactors OData v2</span>
+</footer>
+
+</div><!-- #app -->
+
+<script>
+const socket = io();
+let _sid = null;
+let _running = false;
+
+socket.on('connect', () => { _sid = socket.id; });
+
+// ── UI helpers ──
+const $ = id => document.getElementById(id);
+const show = id => $(id).classList.remove('hidden');
+const hide = id => $(id).classList.add('hidden');
+
+function togglePanel(header) {
+  header.closest('.panel').classList.toggle('collapsed');
+}
+
+// ── Chips ──
+document.querySelectorAll('.chip').forEach(c => {
+  c.addEventListener('click', () => {
+    $('prompt').value = c.textContent;
+    $('prompt').focus();
+  });
+});
+
+// ── Send ──
+function sendQuery() {
+  if (_running) return;
+  const prompt = $('prompt').value.trim();
+  if (!prompt) return;
+
+  _running = true;
+  $('send-btn').disabled = true;
+  $('send-btn').innerHTML = '<span class="spinner"></span> Running…';
+
+  hide('welcome');
+  hide('error-box');
+  hide('results-panel');
+  $('trace-list').innerHTML = '';
+  $('trace-status-dot').style.background = 'var(--warn)';
+  show('trace-panel');
+  document.querySelector('#trace-panel').classList.remove('collapsed');
+
+  socket.emit('run_query', { prompt });
+}
+
+$('send-btn').addEventListener('click', sendQuery);
+$('prompt').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) sendQuery();
+});
+
+// ── Trace events ──
+socket.on('trace', data => {
+  const list = $('trace-list');
+  const step = document.createElement('div');
+
+  if (data.type === 'thinking') {
+    step.className = 'trace-step thinking';
+    step.innerHTML = `<span class="trace-icon">🤔</span><div class="trace-content">Reasoning…<div class="thinking-dot"><span></span><span></span><span></span></div></div>`;
+  } else if (data.type === 'tool_start') {
+    step.className = 'trace-step tool-start';
+    step.id = 'ts-' + Date.now();
+    step.innerHTML = `
+      <span class="trace-icon">⚙</span>
+      <div class="trace-content">
+        <span class="trace-tool">${esc(data.tool)}</span>
+        <div class="trace-input">${esc(data.input)}</div>
+      </div>`;
+  } else if (data.type === 'tool_end') {
+    step.className = 'trace-step tool-end';
+    step.innerHTML = `
+      <span class="trace-icon">✓</span>
+      <div class="trace-content">
+        <span style="color:var(--success);font-weight:600">Done</span>
+        <div class="trace-out">${esc(data.output)}</div>
+      </div>`;
+  }
+
+  list.appendChild(step);
+  step.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+});
+
+// ── Result ──
+socket.on('result', data => {
+  resetBtn();
+  $('trace-status-dot').style.background = 'var(--success)';
+
+  $('summary-text').textContent = data.message || '';
+  show('results-panel');
+
+  if (!data.rows || data.rows.length === 0) {
+    $('table-wrap').innerHTML = '<div class="state-box"><span class="state-icon">📭</span><p>No records matched your query.</p></div>';
+    $('row-count').textContent = '0';
+    $('dl-group').innerHTML = '';
+    return;
+  }
+
+  $('row-count').textContent = data.count;
+  renderTable(data.columns, data.rows);
+
+  // Download buttons
+  const dlg = $('dl-group');
+  dlg.innerHTML = '';
+  if (data.has_csv) {
+    const a = document.createElement('a');
+    a.href = `/download/csv?sid=${encodeURIComponent(_sid)}`;
+    a.className = 'dl-btn csv';
+    a.innerHTML = '⬇ CSV';
+    dlg.appendChild(a);
+  }
+  if (data.has_xlsx) {
+    const a = document.createElement('a');
+    a.href = `/download/xlsx?sid=${encodeURIComponent(_sid)}`;
+    a.className = 'dl-btn xlsx';
+    a.innerHTML = '⬇ Excel';
+    dlg.appendChild(a);
+  }
+});
+
+// ── Error ──
+socket.on('error', data => {
+  resetBtn();
+  $('trace-status-dot').style.background = 'var(--red)';
+  $('error-msg').textContent = data.message || 'Unknown error';
+  show('error-box');
+});
+
+// ── Helpers ──
+function resetBtn() {
+  _running = false;
+  $('send-btn').disabled = false;
+  $('send-btn').innerHTML = `<svg class="send-icon" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg> Run`;
+}
+
+function esc(str) {
+  return String(str ?? '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderTable(cols, rows) {
+  let html = '<table><thead><tr>';
+  cols.forEach(c => { html += `<th title="${esc(c)}">${esc(c)}</th>`; });
+  html += '</tr></thead><tbody>';
+
+  rows.forEach(row => {
+    html += '<tr>';
+    cols.forEach(c => {
+      const v = row[c];
+      if (v === null || v === undefined || v === '') {
+        html += '<td><span class="null-val">—</span></td>';
+      } else {
+        html += `<td title="${esc(v)}">${esc(v)}</td>`;
+      }
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  $('table-wrap').innerHTML = html;
+}
+</script>
+</body>
+</html>
