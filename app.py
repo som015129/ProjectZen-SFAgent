@@ -8,8 +8,8 @@ import json
 import threading
 from pathlib import Path
 
-from flask import Flask, render_template, send_file, request
-from flask_socketio import SocketIO
+from flask import Flask, render_template, send_file, request, session, redirect, url_for
+from flask_socketio import SocketIO, disconnect
 from langchain_core.callbacks import BaseCallbackHandler
 from dotenv import load_dotenv
 
@@ -52,8 +52,30 @@ class _WebCallback(BaseCallbackHandler):
         self._emit("trace", {"type": "thinking"})
 
 
+_APP_PASSWORD = os.environ.get("APP_PASSWORD", "")
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    error = ""
+    if request.method == "POST":
+        if request.form.get("password") == _APP_PASSWORD:
+            session["auth"] = True
+            return redirect(url_for("index"))
+        error = "Incorrect password."
+    return render_template("login.html", error=error)
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+
 @app.route("/")
 def index():
+    if _APP_PASSWORD and not session.get("auth"):
+        return redirect(url_for("login"))
     return render_template("index.html")
 
 
@@ -69,6 +91,9 @@ def download(fmt: str):
 
 @socketio.on("run_query")
 def on_run_query(data):
+    if _APP_PASSWORD and not session.get("auth"):
+        disconnect()
+        return
     sid = request.sid
     prompt = (data.get("prompt") or "").strip()
     if not prompt:
